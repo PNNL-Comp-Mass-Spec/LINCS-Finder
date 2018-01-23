@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>KEGG Pathway Visualization for Genesets</title>
+<style type="text/css">
+rect.entry.active {
+	opacity: 0.4;
+	stroke: black;
+    stroke-width: 1;
+}
+
+/*rect.entry {
+	opacity: 0.5;
+	stroke: white;
+    stroke-width: 3;
+    
+}*/
+
+/*rect.roundRec.entry {
+	opacity: 0.4;
+}*/
+
+rect.entry:hover {
+	opacity: 0.2;
+	cursor: pointer;
+}
+
+circle.entry.active {
+	opacity: 0.6;
+}
+
+/*circle.entry {
+	opacity: 0.9;
+}*/
+
+circle.entry:hover {
+	opacity: 0.2;
+	cursor: pointer;
+}
+
+path.entry {
+	opacity: 0.9;
+	fill: none;
+	stroke: none;
+	stroke-width: 3px;
+	cursor: pointer;
+}
+
+path.entry:hover {
+	opacity: 0.2;
+	stroke-width: 3px;
+}
+</style>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.13/semantic.min.css"></link>
+</head>
+<body style="overflow: hidden">
+	<div id="kegg"></div>
+    <div class="ui menu">
+      <div class="right menu">
+        <div id="nodeInfo" class="item icon button">
+          <i class="large circle info icon"></i>
+        </div>
+      </div>
+    </div>
+    <div class="ui grid">
+		<div class="twelve wide column">
+			<div class="ui segment" style="overflow: hidden">
+				<!-- div id="pathway-controller" class="ui message">
+					<div class="ui group field" style="display: none;">
+						<div class="ui sub header">Group</div>
+						<div id="groupDrop" class="ui selection fluid dropdown">
+							<div class="text"></div>
+							<i class="dropdown icon"></i>
+							<div class="menu"></div>
+						</div>
+					</div>
+				</div-->
+				<div id="pathway"></div>
+				<div id="popupContainer"></div>
+			</div>
+		</div>
+		<div class="four wide column">
+			<p>test</p>
+		</div>
+	</div>
+	
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+	<script src="https://d3js.org/d3.v4.min.js"></script>
+	<script src="https://d3js.org/d3-selection-multi.v1.min.js"></script>
+  	<script src="https://cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.13/semantic.min.js"></script>
+	<script src="js/pathway.js"></script>
+	<script type="text/javascript">
+		$( document ).ready(function() {
+			function getURLParameter(name) {
+				return decodeURIComponent((new RegExp('[?|&]' + name + '=' + '([^&;]+?)(&|#|;|$)').exec(location.search)||[,""])[1].replace(/\+/g, '%20'))||null
+			}
+			var pid = getURLParameter('id');
+			var nodes = getURLParameter('nodes').split(',');
+			// var pid = "hsa00020"
+			// var nodes = ['LJP005_A375_24H:G01']
+			var keggPathway = new KeggPathway(pid, nodes, d3.select('#pathway'));
+		});
+</script>
+</body>
+</html>

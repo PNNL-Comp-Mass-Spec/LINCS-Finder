@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>LINCS L1000/P100 Query Engine</title>
+<link rel="icon" href="data:;base64,iVBORw0KGgo=">
+<link rel="stylesheet" type="text/css" class="ui" charset="utf-8" href="//oss.maxcdn.com/semantic-ui/2.2.2/semantic.min.css">
+
+<link rel="stylesheet" href="//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.6/semantic.min.css">
+<link rel="stylesheet" href="https://cdn.datatables.net/1.10.15/css/dataTables.semanticui.min.css">
+
+<script src="//code.jquery.com/jquery-1.12.4.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/jquery.dataTables.min.js"></script>
+<script src="https://cdn.datatables.net/1.10.16/js/dataTables.semanticui.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.5.1/js/dataTables.buttons.min.js"></script>
+<script src="https://cdn.datatables.net/buttons/1.5.1/js/buttons.semanticui.min.js"></script>
+<script src="//cdn.datatables.net/buttons/1.5.1/js/buttons.flash.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/jszip/3.1.3/jszip.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.32/pdfmake.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/pdfmake/0.1.32/vfs_fonts.js"></script>
+<script src="//cdn.datatables.net/buttons/1.5.1/js/buttons.html5.min.js"></script>
+<script src="//cdn.datatables.net/buttons/1.5.1/js/buttons.print.min.js"></script>
+<script src="//cdn.datatables.net/buttons/1.5.1/js/buttons.colVis.min.js"></script>
+<script src="//cdnjs.cloudflare.com/ajax/libs/semantic-ui/2.2.6/semantic.min.js"></script>
+
+<script src="https://d3js.org/d3.v4.min.js"></script>
+</head>
+
+<body>
+  <div class="ui top attached menu">
+    
+    <div class="right menu">
+      <div id="pert_search" class="ui item search">
+        <div class="ui icon input">
+          <input class="prompt" type="text" placeholder="Search drugs or cellines">
+          <i class="search icon"></i>
+        </div>
+        <div class="results"></div>
+      </div>
+      <div id="node_search" class="ui item search">
+        <div class="ui icon input">
+          <input class="prompt" type="text" placeholder="Search Nodes">
+          <i class="search icon"></i>
+        </div>
+        <div class="results"></div>
+      </div>
+    </div>
+    
+  </div>
+  <div class="ui segment container">
+    <h2 class="ui header">LINCS L1000/P100 Query Engine</h2>
+    <p>The LINCS L1000 and P100 assays provide a rich molecular characterization of cellular response to perturbation. To help make this data resource accessible, we have created this query engine which allows you to paste in a set of genes which are up/down regulated and find the most similar LINCS datasets.</p>
+    <p>Submit your own list of genes to query the similar signatures.</p>
+  <div id="lincs_query" class="ui form">
+    <div class="two fields">
+      <div class="field upgenes">
+          <label>Up-regulated Genes</label>
+          <textarea rows="10" name="upgenes" class="upgenes"></textarea>
+          <label class="upgenes" style="text-align:right">0 Genes</label>
+        </div>
+        <div class="field">
+          <label>Down-regulated Genes</label>
+          <textarea rows="10" name="dngenes" class="dngenes"></textarea>
+          <label class="dngenes" style="text-align:right">0 Genes</label>
+        </div>
+      </div>
+      <div id="query" class="ui primary submit button">Submit</div>
+      <div class="ui error message"></div>
+    </div>
+  </div>
+  <div class="ui segment container">
+    <h3 class="ui header">Positive Connectivity</h3>
+    <table id="pos" class="ui celled table" cellspacing="0" width="100%">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Cell Line</th>
+          <th>Pert Name</th>
+          <th>Pert Type</th>
+          <th>Pert Dose</th>
+          <th>Pert Time</th>
+          <th>up/up match</th>
+          <th>dn/dn match</th>
+          <th>up/dn match</th>
+          <th>dn/up match</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+  <div class="ui segment container">
+    <h3 class="ui header">Negative Connectivity</h3>
+    <table id="neg" class="ui celled table" cellspacing="0" width="100%">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Cell Line</th>
+          <th>Pert Name</th>
+          <th>Pert Type</th>
+          <th>Pert Dose</th>
+          <th>Pert Time</th>
+          <th>up/up match</th>
+          <th>dn/dn match</th>
+          <th>up/dn match</th>
+          <th>dn/up match</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+  <div class="ui segment container">
+    <h3 class="ui header">Pathways</h3>
+    <table id="pathway" class="ui celled table" cellspacing="0" width="100%">
+      <thead>
+        <tr>
+          <th>Pathway ID</th>
+          <th>Descriptions</th>
+          <th>p-value</th>
+          <th>#overlaps</th>
+        </tr>
+      </thead>
+      <tbody>
+      </tbody>
+    </table>
+  </div>
+  <div class="ui segment container">
+    <div id="heatmap" style='overflow:auto; width:100%; height:480px;'></div>
+  </div>
+  <script type="text/javascript">
+  $(document).ready(function() {
+
+    // var pos_table = $('table#pos').DataTable();
+    // var neg_table = $('table#neg').DataTable();
+    // var path_table = $('table#pathway').DataTable();
+
+    var pos_table = $('table#pos').DataTable({
+      lengthChange: false,
+      buttons: [ 'copy', 'excel', 'pdf', 'colvis' ],
+      columns: [
+        {data: "sig_id"},
+        {data: "cell_id"},
+        {data: "pert_iname"},
+        {data: "pert_type"},
+        {data: "pert_idose"},
+        {data: "pert_itime"},
+        {data: "upup"},
+        {data: "dndn"},
+        {data: "updn"},
+        {data: "dnup"}
+      ]
+    });
+    var neg_table = $('table#neg').DataTable({
+      lengthChange: false,
+      buttons: [ 'copy', 'excel', 'pdf', 'colvis' ],
+      columns: [
+        {data: "sig_id"},
+        {data: "cell_id"},
+        {data: "pert_iname"},
+        {data: "pert_type"},
+        {data: "pert_idose"},
+        {data: "pert_itime"},
+        {data: "upup"},
+        {data: "dndn"},
+        {data: "updn"},
+        {data: "dnup"}
+      ]
+    });
+    var path_table = $('table#pathway').DataTable({
+      lengthChange: false,
+      buttons: [ 'copy', 'excel', 'pdf', 'colvis' ],
+      columns: [
+        {data: "pathway"},
+        {data: "desc"},
+        {data: "pvalue"},
+        {data: "overlap"}
+      ]
+    });
+
+    pos_table.buttons().container().appendTo( $('div.eight.column:eq(0)', pos_table.table().container()) );
+    neg_table.buttons().container().appendTo( $('div.eight.column:eq(0)', neg_table.table().container()) );
+    path_table.buttons().container().appendTo( $('div.eight.column:eq(0)', path_table.table().container()) );
+    
+    var fillTable = function(id, data) {
+      $('table#'+id+' tbody').empty()
+      var tr;
+      for (var i = 0; i < data.length; i++) {
+          tr = $('<tr/>');
+          tr.append("<td>" + data[i].sig_id + "</td>");
+          tr.append("<td>" + data[i].cell_id + "</td>");
+          tr.append("<td>" + data[i].pert_iname + "</td>");
+          tr.append("<td>" + data[i].pert_type + "</td>");
+          tr.append("<td>" + data[i].pert_idose + "</td>");
+          tr.append("<td>" + data[i].pert_itime + "</td>");
+          tr.append("<td>" + data[i].upup + "</td>");
+          tr.append("<td>" + data[i].dndn + "</td>");
+          tr.append("<td>" + data[i].updn + "</td>");
+          tr.append("<td>" + data[i].dnup + "</td>");
+          $('table#'+id+' tbody').append(tr);
+      }
+    };
+
+    var fillPathwayTable = function(id, data) {
+      $('table#'+id+' tbody').empty()
+      var tr;
+      for (var i = 0; i < data.length; i++) {
+          tr = $('<tr/>');
+          tr.append("<td>" + data[i].pathway.split(':')[1] + "</td>");
+          tr.append("<td>" + data[i].desc + "</td>");
+          tr.append("<td>" + data[i].pvalue + "</td>");
+          tr.append("<td>" + data[i].overlap + "</td>");
+          $('table#'+id+' tbody').append(tr);
+      }
+    };
+
+    var getGenesArr = function(str) {
+      return str.toUpperCase().split(/\r\n|\r|\n/g).filter(function (value, index, self) {
+        return value !== "" && self.indexOf(value) === index;
+      });
+    }
+
+    var drawHeatmap = function(data) {
+      var margin = { top: 150, right: 10, bottom: 50, left: 100 },
+        cellSize=12,
+        col_number=60,
+        row_number=50,
+        width = cellSize*col_number, // - margin.left - margin.right,
+        height = cellSize*row_number , // - margin.top - margin.bottom,
+        legendElementWidth = cellSize*2.5,
+        // colors
+        colorBuckets = 21,
+        colors = ['#005824','#1A693B','#347B53','#4F8D6B','#699F83','#83B09B','#9EC2B3','#B8D4CB','#D2E6E3','#EDF8FB','#FFFFFF','#F1EEF6','#E6D3E1','#DBB9CD','#D19EB9','#C684A4','#BB6990','#B14F7C','#A63467','#9B1A53','#91003F'],
+        // hcluster
+        // hcrow = [49,11,30,4,18,6,12,20,19,33,32,26,44,35,38,3,23,41,22,10,2,15,16,36,8,25,29,7,27,34,48,31,45,43,14,9,39,1,37,47,42,21,40,5,28,46,50,17,24,13], // change to gene name or probe id
+        // hccol = [6,5,41,12,42,21,58,56,14,16,43,15,17,46,47,48,54,49,37,38,25,22,7,8,2,45,9,20,24,44,23,19,13,40,11,1,39,53,10,52,3,26,27,60,50,51,59,18,31,32,30,4,55,28,29,57,36,34,33,35], // change to gene name or probe id
+        // rowLabel = ['1759080_s_at','1759302_s_at','1759502_s_at','1759540_s_at','1759781_s_at','1759828_s_at','1759829_s_at','1759906_s_at','1760088_s_at','1760164_s_at','1760453_s_at','1760516_s_at','1760594_s_at','1760894_s_at','1760951_s_at','1761030_s_at','1761128_at','1761145_s_at','1761160_s_at','1761189_s_at','1761222_s_at','1761245_s_at','1761277_s_at','1761434_s_at','1761553_s_at','1761620_s_at','1761873_s_at','1761884_s_at','1761944_s_at','1762105_s_at','1762118_s_at','1762151_s_at','1762388_s_at','1762401_s_at','1762633_s_at','1762701_s_at','1762787_s_at','1762819_s_at','1762880_s_at','1762945_s_at','1762983_s_at','1763132_s_at','1763138_s_at','1763146_s_at','1763198_s_at','1763383_at','1763410_s_at','1763426_s_at','1763490_s_at','1763491_s_at'], // change to gene name or probe id
+        // colLabel = ['con1027','con1028','con1029','con103','con1030','con1031','con1032','con1033','con1034','con1035','con1036','con1037','con1038','con1039','con1040','con1041','con108','con109','con110','con111','con112','con125','con126','con127','con128','con129','con130','con131','con132','con133','con134','con135','con136','con137','con138','con139','con14','con15','con150','con151','con152','con153','con16','con17','con174','con184','con185','con186','con187','con188','con189','con191','con192','con193','con194','con199','con2','con200','con201','con21']; // change to contrast name
+        rowLabel = [0,1,2,3,4,5,6,7,8,9,10],
+        // rowLabel = data.index.slice(100),
+        colLabel = data.columns,
+        hcrow = [...Array(rowLabel.length).keys()],
+        hccol = [...Array(colLabel.length).keys()];
+
+        mat_data = []
+        hcrow.forEach(function(rowidx){
+          hccol.forEach(function(colidx){
+            mat_data.push({
+              row:   +rowidx,
+              col:   +colidx,
+              value: +data.data[rowidx][colidx]
+            });
+            
+          });
+        });
+
+      var init = function(data) {
+        console.log(data);
+        // create a color scale
+        var colorScale = d3.scale.quantile()
+          .domain([ -10 , 0, 10])
+          .range(colors);
+        var svg = d3.select("#heatmap").append("svg")
+          .attr("width", width + margin.left + margin.right)
+          .attr("height", height + margin.top + margin.bottom)
+          .append("g")
+          .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
+        
+        var rowSortOrder=false;
+        var colSortOrder=false;
+        var rowLabels = svg.append("g")
+          .selectAll(".rowLabelg")
+          .data(rowLabel)
+          .enter()
+          .append("text")
+          .text(function (d) { return d; })
+          .attr("x", 0)
+          .attr("y", function (d, i) { return hcrow.indexOf(i+1) * cellSize; })
+          .style("text-anchor", "end")
+          .attr("transform", "translate(-6," + cellSize / 1.5 + ")")
+          .attr("class", function (d,i) { return "rowLabel mono r"+i;} ) 
+          .on("mouseover", function(d) {d3.select(this).classed("text-hover",true);})
+          .on("mouseout" , function(d) {d3.select(this).classed("text-hover",false);})
+          .on("click", function(d,i) {rowSortOrder=!rowSortOrder; sortbylabel("r",i,rowSortOrder);d3.select("#order").property("selectedIndex", 4).node().focus();});
+        
+        var colLabels = svg.append("g")
+          .selectAll(".colLabelg")
+          .data(colLabel)
+          .enter()
+          .append("text")
+          .text(function (d) { return d; })
+          .attr("x", 0)
+          .attr("y", function (d, i) { return hccol.indexOf(i+1) * cellSize; })
+          .style("text-anchor", "left")
+          .attr("transform", "translate("+cellSize/2 + ",-6) rotate (-90)")
+          .attr("class",  function (d,i) { return "colLabel mono c"+i;} )
+          .on("mouseover", function(d) {d3.select(this).classed("text-hover",true);})
+          .on("mouseout" , function(d) {d3.select(this).classed("text-hover",false);})
+          .on("click", function(d,i) {colSortOrder=!colSortOrder;  sortbylabel("c",i,colSortOrder);d3.select("#order").property("selectedIndex", 4).node().focus();});
+
+        var heatMap = svg.append("g").attr("class","g3")
+          .selectAll(".cellg")
+          .data(data,function(d){return d.row+":"+d.col;})
+          .enter()
+          .append("rect")
+          .attr("x", function(d) { return hccol.indexOf(d.col) * cellSize; })
+          .attr("y", function(d) { return hcrow.indexOf(d.row) * cellSize; })
+          .attr("class", function(d){return "cell cell-border cr"+(d.row-1)+" cc"+(d.col-1);})
+          .attr("width", cellSize)
+          .attr("height", cellSize)
+          .style("fill", function(d) { return colorScale(d.value); })
+          .on("mouseover", function(d){
+               //highlight text
+               d3.select(this).classed("cell-hover",true);
+               d3.selectAll(".rowLabel").classed("text-highlight",function(r,ri){ return ri==(d.row-1);});
+               d3.selectAll(".colLabel").classed("text-highlight",function(c,ci){ return ci==(d.col-1);});
+        
+               //Update the tooltip position and value
+               d3.select("#tooltip")
+                 .style("left", (d3.event.pageX+10) + "px")
+                 .style("top", (d3.event.pageY-10) + "px")
+                 .select("#value")
+                 .text("lables:"+rowLabel[d.row-1]+","+colLabel[d.col-1]+"\ndata:"+d.value+"\nrow-col-idx:"+d.col+","+d.row+"\ncell-xy "+this.x.baseVal.value+", "+this.y.baseVal.value);  
+               //Show the tooltip
+               d3.select("#tooltip").classed("hidden", false);
+          })
+          .on("mouseout", function(){
+               d3.select(this).classed("cell-hover",false);
+               d3.selectAll(".rowLabel").classed("text-highlight",false);
+               d3.selectAll(".colLabel").classed("text-highlight",false);
+               d3.select("#tooltip").classed("hidden", true);
+          });
+
+        var legend = svg.selectAll(".legend")
+          .data([-10,-9,-8,-7,-6,-5,-4,-3,-2,-1,0,1,2,3,4,5,6,7,8,9,10])
+          .enter().append("g")
+          .attr("class", "legend");
+ 
+        legend.append("rect")
+          .attr("x", function(d, i) { return legendElementWidth * i; })
+          .attr("y", height+(cellSize*2))
+          .attr("width", legendElementWidth)
+          .attr("height", cellSize)
+          .style("fill", function(d, i) { return colors[i]; });
+ 
+        legend.append("text")
+          .attr("class", "mono")
+          .text(function(d) { return d; })
+          .attr("width", legendElementWidth)
+          .attr("x", function(d, i) { return legendElementWidth * i; })
+          .attr("y", height + (cellSize*4));
+
+        function sortbylabel(rORc, i, sortOrder) {
+          var t = svg.transition().duration(3000);
+          var log2r=[];
+          var sorted; // sorted is zero-based index
+          d3.selectAll(".c"+rORc+i) 
+            .filter(function(ce){
+              log2r.push(ce.value);
+            });
+          if(rORc=="r") {
+            sorted=d3.range(col_number).sort(function(a,b){ if(sortOrder){ return log2r[b]-log2r[a];}else{ return log2r[a]-log2r[b];}});
+            t.selectAll(".cell").attr("x", function(d) { return sorted.indexOf(d.col-1) * cellSize; });
+            t.selectAll(".colLabel").attr("y", function (d, i) { return sorted.indexOf(i) * cellSize; });
+          } else { // sort log2ratio of a contrast
+            sorted=d3.range(row_number).sort(function(a,b){if(sortOrder){ return log2r[b]-log2r[a];}else{ return log2r[a]-log2r[b];}});
+            t.selectAll(".cell").attr("y", function(d) { return sorted.indexOf(d.row-1) * cellSize; });
+            t.selectAll(".rowLabel").attr("y", function (d, i) { return sorted.indexOf(i) * cellSize; });
+          }
+        }
+
+        // d3.select("#order").on("change",function(){
+        //   order(this.value);
+        // });
+
+        function order(value) {
+          if(value=="hclust") {
+            var t = svg.transition().duration(3000);
+            t.selectAll(".cell")
+              .attr("x", function(d) { return hccol.indexOf(d.col) * cellSize; })
+              .attr("y", function(d) { return hcrow.indexOf(d.row) * cellSize; });
+
+            t.selectAll(".rowLabel")
+              .attr("y", function (d, i) { return hcrow.indexOf(i+1) * cellSize; });
+
+            t.selectAll(".colLabel")
+              .attr("y", function (d, i) { return hccol.indexOf(i+1) * cellSize; });
+
+          } else if (value=="probecontrast") {
+            var t = svg.transition().duration(3000);
+            t.selectAll(".cell")
+              .attr("x", function(d) { return (d.col - 1) * cellSize; })
+              .attr("y", function(d) { return (d.row - 1) * cellSize; })
+              ;
+
+            t.selectAll(".rowLabel")
+              .attr("y", function (d, i) { return i * cellSize; })
+              ;
+
+            t.selectAll(".colLabel")
+              .attr("y", function (d, i) { return i * cellSize; })
+              ;
+
+          } else if (value=="probe") {
+            var t = svg.transition().duration(3000);
+            t.selectAll(".cell")
+              .attr("y", function(d) { return (d.row - 1) * cellSize; })
+              ;
+
+            t.selectAll(".rowLabel")
+              .attr("y", function (d, i) { return i * cellSize; })
+              ;
+          } else if (value=="contrast") {
+            var t = svg.transition().duration(3000);
+            t.selectAll(".cell")
+              .attr("x", function(d) { return (d.col - 1) * cellSize; })
+              ;
+            t.selectAll(".colLabel")
+              .attr("y", function (d, i) { return i * cellSize; })
+              ;
+          }
+        }
+
+        var sa = d3.select(".g3")
+          .on("mousedown", function() {
+            if( !d3.event.altKey) {
+              d3.selectAll(".cell-selected").classed("cell-selected",false);
+              d3.selectAll(".rowLabel").classed("text-selected",false);
+              d3.selectAll(".colLabel").classed("text-selected",false);
+            }
+           var p = d3.mouse(this);
+           sa.append("rect")
+           .attr({
+              rx      : 0,
+              ry      : 0,
+              class   : "selection",
+              x       : p[0],
+              y       : p[1],
+              width   : 1,
+              height  : 1
+            })
+          })
+        .on("mousemove", function() {
+          var s = sa.select("rect.selection");
+          if(!s.empty()) {
+            var p = d3.mouse(this),
+                 d = {
+                     x       : parseInt(s.attr("x"), 10),
+                     y       : parseInt(s.attr("y"), 10),
+                     width   : parseInt(s.attr("width"), 10),
+                     height  : parseInt(s.attr("height"), 10)
+                 },
+                 move = {
+                     x : p[0] - d.x,
+                     y : p[1] - d.y
+                 }
+             ;
+      
+             if(move.x < 1 || (move.x*2<d.width)) {
+                 d.x = p[0];
+                 d.width -= move.x;
+             } else {
+                 d.width = move.x;       
+             }
+      
+             if(move.y < 1 || (move.y*2<d.height)) {
+                 d.y = p[1];
+                 d.height -= move.y;
+             } else {
+                 d.height = move.y;       
+             }
+             s.attr(d);
+
+            // deselect all temporary selected state objects
+            d3.selectAll('.cell-selection.cell-selected').classed("cell-selected", false);
+            d3.selectAll(".text-selection.text-selected").classed("text-selected",false);
+
+            d3.selectAll('.cell').filter(function(cell_d, i) {
+              if(
+                !d3.select(this).classed("cell-selected") && 
+                // inner circle inside selection frame
+                (this.x.baseVal.value)+cellSize >= d.x && (this.x.baseVal.value)<=d.x+d.width && 
+                (this.y.baseVal.value)+cellSize >= d.y && (this.y.baseVal.value)<=d.y+d.height
+              ) {
+                d3.select(this)
+                  .classed("cell-selection", true)
+                  .classed("cell-selected", true);
+
+                d3.select(".r"+(cell_d.row-1))
+                  .classed("text-selection",true)
+                  .classed("text-selected",true);
+
+                d3.select(".c"+(cell_d.col-1))
+                  .classed("text-selection",true)
+                  .classed("text-selected",true);
+              }
+            });
+          }
+        })
+        .on("mouseup", function() {
+          // remove selection frame
+          sa.selectAll("rect.selection").remove();
+        
+          // remove temporary selection marker class
+          d3.selectAll('.cell-selection').classed("cell-selection", false);
+          d3.selectAll(".text-selection").classed("text-selection",false);
+        })
+        .on("mouseout", function() {
+          if(d3.event.relatedTarget.tagName=='html') {
+            // remove selection frame
+            sa.selectAll("rect.selection").remove();
+            // remove temporary selection marker class
+            d3.selectAll('.cell-selection').classed("cell-selection", false);
+            d3.selectAll(".rowLabel").classed("text-selected",false);
+            d3.selectAll(".colLabel").classed("text-selected",false);
+          }
+        });
+      }
+
+      init(mat_data);
+      // d3.tsv("test.txt", function(d) {
+      //   return {
+      //     row:   +d.row_idx,
+      //     col:   +d.col_idx,
+      //     value: +d.log2ratio
+      //   };
+      // }, function(error, data) {
+      //   init(data);
+      // });
+    }
+
+    $("textarea").change(function(evt){
+      $(this).val($(this).val().toUpperCase());
+      var genes = getGenesArr($(this).val());
+      $("label."+$(this).attr('name')).html(genes.length + " Genes");
+    });
+
+    $("#query").click(function(evt) {
+      var upgenes = getGenesArr($("textarea.upgenes").val());
+      var dngenes = getGenesArr($("textarea.dngenes").val());
+      $.ajax({
+        url:'/lincs/query',
+        method: 'GET',
+        data: {up:upgenes, dn:dngenes, limit:50},
+        dataType: "jsonp",
+        jsonpCallback: "lincs_table"
+      }).done(function(data) {
+        pos_table.clear().draw();
+        neg_table.clear().draw();
+        var pos_data = JSON.parse(data.pos);
+        var neg_data = JSON.parse(data.neg);
+
+        pos_table.rows.add(pos_data).draw();
+        neg_table.rows.add(neg_data).draw();
+
+        var sig_ids = pos_data.map(function(k){
+          return k.cid;
+        }).concat(neg_data.map(function(k){
+          return k.cid;
+        }));
+        $.ajax({
+          url:'/lincs/gene_matix',
+          method: 'GET',
+          data: {sids:sig_ids},
+          dataType: "jsonp",
+          jsonpCallback: "lincs_gene_matrix"
+        }).done(function(data) {
+          drawHeatmap(data);
+        });
+      });
+
+      $.ajax({
+        url:'/kegg',
+        method: 'GET',
+        data: {genes:upgenes.concat(dngenes), limit:200},
+        dataType: "jsonp",
+        jsonpCallback: "kegg_results"
+      }).done(function(data) {
+        path_table.clear().draw();
+        path_table.rows.add(data).draw();
+      });
+
+      // collect the kegg gene information
+      $.ajax({
+        url:'kegg/ids',
+        method: 'GET',
+        data: {genes:upgenes.concat(dngenes)},
+        dataType: "jsonp",
+        jsonpCallback: "keggid_results"
+      }).done(function(data) {
+        // store the user data in localstorage
+        localStorage['kegg_genes']=JSON.stringify(data);
+        localStorage['user_genes']=JSON.stringify({up:upgenes, dn:dngenes});
+      });
+    });
+
+    // load the LINCS meta information for all the signatures (117,373)
+    // $.ajax({
+    //   url:'/lincs/meta',
+    //   success: function(data, status) {
+    //     var rst = JSON.parse(data)
+    //     console.log(rst)
+    //   }
+    // });
+  });
+  </script>
+</body>
+</html>
