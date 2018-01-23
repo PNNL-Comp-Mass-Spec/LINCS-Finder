@@ -8,11 +8,11 @@ We provide a docker version for this application. Please refer to these followin
 
 1. Install the latest docker in your machine.
 Please refer to https://docs.docker.com/engine/installation/.
-2. Pull the BSF image.
+2. Pull the LINCS Finder image.
 ```bash
 docker pull coldfire79/lincs-finder
 ```
-3. Run the BSF image.
+3. Run the LINCS Finder image.
 ```bash
 docker run -p 127.0.0.1:8081:8081 -it --name lincs-finder coldfire79/lincs-finder
 ```
